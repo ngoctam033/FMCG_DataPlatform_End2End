@@ -1,0 +1,57 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE and operating system
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Java / JVM
+.gradle/
+build/
+target/
+*.class
+
+# JavaScript / TypeScript
+node_modules/
+dist/
+.npm/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl
+
+# Data and local runtime artifacts
+data/*
+!data/README.md
+!data/.gitkeep
+logs/
+tmp/
+artifacts/
+
+# Generated analytics and notebook files
+.ipynb_checkpoints/
+*.parquet
+*.avro
+*.orc
+
