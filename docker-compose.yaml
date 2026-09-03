@@ -1,0 +1,4 @@
+name: fmcg-data-platform
+
+include:
+  - path: ./services/data-source-simulators/odoo-erp/deployment/docker-compose.odoo.yaml

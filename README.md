@@ -115,16 +115,25 @@ Codebase ban đầu được tổ chức theo trách nhiệm và giữ trung l�
 ├── orchestration/     # Workflow, lịch chạy và dependency
 ├── quality/           # Data quality rules và validation suites
 ├── scripts/           # Tiện ích phát triển và vận hành
-├── services/          # Các backend services (ví dụ: data-source-simulators)
+├── services/          # Source simulators, gồm simple generators và Odoo ERP
 ├── src/               # Mã nguồn dùng chung của platform
 ├── tests/             # Integration, contract và end-to-end tests
 ├── transformation/    # Làm sạch, chuẩn hóa và mô hình hóa dữ liệu
 ├── .env.example       # Mẫu biến môi trường cục bộ
 ├── .gitignore
+├── docker-compose.yaml # Compose tổng, tập hợp các service local
 └── README.md          # Điểm bắt đầu của dự án
 ```
 
 Mỗi khu vực có README riêng mô tả trách nhiệm. Package và cấu hình đặc thù công nghệ sẽ được bổ sung sau khi có quyết định kiến trúc đầu tiên.
+
+Compose tổng tại root hiện bao gồm Odoo ERP simulator. Trước khi validate hoặc khởi động, cần cung cấp `ODOO_DB_PASSWORD` trong môi trường local:
+
+```bash
+export ODOO_DB_PASSWORD='<local-password>'
+docker compose -f docker-compose.yaml config --quiet
+docker compose -f docker-compose.yaml up -d
+```
 
 ## Bắt đầu
 
