@@ -3,6 +3,8 @@ import logging
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import UserError
 
+from datetime import timedelta
+import random
 
 _logger = logging.getLogger(__name__)
 
@@ -25,7 +27,7 @@ class FmcgSimulatorRun(models.AbstractModel):
     def cron_master(self):
         """Orchestrator chạy tuần tự các kịch bản mới."""
         self.cron_inventory_replenish_new()
-        # self.cron_purchase_user_process()
+        self.cron_purchase_user_process()
         # self.cron_purchase_manager_approve()
         # self.cron_inventory_user_receipt()
         # self.cron_inventory_user_transfer()
@@ -101,15 +103,81 @@ class FmcgSimulatorRun(models.AbstractModel):
 
     @api.model
     def cron_purchase_user_process(self):
-        """2. NV Mua hàng: Xử lý Draft RFQ -> Chốt đơn."""
+        """2. NV Mua hàng: Xử lý RFQ được simulator giao."""
         user = self._get_simulator_user("purchase.user.simulator")
-        if not user: return False
+        if not user:
+            return False
+
         self = self.with_user(user).with_company(user.company_id)
-        
-        draft_rfqs = self.env["purchase.order"].search([("state", "in", ["draft", "sent"])])
-        if draft_rfqs:
-            _logger.info("Purchase User: Chốt %d đơn hàng", len(draft_rfqs))
-            draft_rfqs.button_confirm()
+        todo_type = self.env.ref("mail.mail_activity_data_todo")
+        task_summary = "Chốt đơn mua hàng (Tự động từ Simulator)"
+
+        # 1. Tìm các Activity đang pending của user này
+        activities = self.env["mail.activity"].search([
+            ("res_model", "=", "purchase.order"),
+            ("user_id", "=", user.id),
+            ("activity_type_id", "=", todo_type.id),
+            ("summary", "=", task_summary),
+        ])
+
+        if not activities:
+            return True
+
+        # 2. Giả lập delay: Chỉ lấy các task đã được tạo cách đây ít nhất 30 phút
+        # Chọn một mốc delay ngẫu nhiên từ 15 phút đến 4 tiếng cho lần chạy này
+        random_minutes = random.randint(15, 240)
+        delay_threshold = fields.Datetime.now() - timedelta(minutes=random_minutes)
+        due_activities = activities.filtered(lambda a: a.create_date and a.create_date <= delay_threshold)
+
+        if not due_activities:
+            _logger.info("Purchase User: Có %d task nhưng chưa đến hạn xử lý (cần đợi thêm để giả lập delay).", len(activities))
+            return True
+
+        rfqs = self.env["purchase.order"].search([
+            ("id", "in", due_activities.mapped("res_id")),
+            ("company_id", "=", user.company_id.id),
+            ("state", "in", ["draft", "sent"]),
+        ], order="id", limit=50)
+
+        confirmed = waiting = failed = 0
+
+        for rfq in rfqs:
+            # Click xác nhận đơn hàng
+            rfq.button_confirm()
+
+            # Đóng task của Purchase User
+            tasks = due_activities.filtered(
+                lambda activity: activity.res_id == rfq.id
+            )
+            tasks.action_feedback(
+                feedback="Đã xử lý RFQ. Trạng thái: %s." % rfq.state
+            )
+
+            # 3. Phân nhánh xử lý sau khi xác nhận
+            if rfq.state == 'to approve':
+                waiting += 1
+                _logger.info("Purchase User: %s -> Cần Quản lý duyệt (to approve)", rfq.name)
+                
+                # Sinh task cho Purchase Manager (Giả lập chuyển bước)
+                manager = self._get_simulator_user("purchase.manager.simulator")
+                if manager:
+                    rfq.sudo().activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        user_id=manager.id,
+                        summary='Duyệt đơn mua hàng (Tự động từ Simulator)',
+                        note='Đơn hàng vượt ngân sách, cần Quản lý mua hàng phê duyệt.'
+                    )
+            elif rfq.state in ['purchase', 'done']:
+                confirmed += 1
+                _logger.info("Purchase User: %s -> Xác nhận thành công (purchase)", rfq.name)
+            else:
+                failed += 1
+                _logger.info("Purchase User: %s -> Không thành công, trạng thái: %s", rfq.name, rfq.state)
+
+        _logger.info(
+            "Purchase User: Đã xác nhận %d, chờ duyệt %d, lỗi %d",
+            confirmed, waiting, failed,
+        )
         return True
 
     @api.model
