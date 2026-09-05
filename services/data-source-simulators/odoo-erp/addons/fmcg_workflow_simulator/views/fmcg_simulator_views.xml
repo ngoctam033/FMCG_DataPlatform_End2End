@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_fmcg_simulator_cron" model="ir.actions.act_window">
+        <field name="name">FMCG Simulator Schedules</field>
+        <field name="res_model">ir.cron</field>
+        <field name="view_mode">list,form,calendar</field>
+        <field name="view_id" ref="base.ir_cron_view_tree"/>
+        <field name="search_view_id" ref="base.ir_cron_view_search"/>
+        <field name="domain" eval="[('model_id', '=', ref('model_fmcg_simulator_run'))]"/>
+        <field name="context">{'search_default_all': 1}</field>
+    </record>
+
+    <menuitem
+        id="menu_fmcg_simulator_root"
+        name="FMCG Simulator"
+        action="action_fmcg_simulator_cron"
+        sequence="90"
+        groups="base.group_system"
+    />
+
+    <menuitem
+        id="menu_fmcg_simulator_schedules"
+        name="Scheduled Actions"
+        parent="menu_fmcg_simulator_root"
+        action="action_fmcg_simulator_cron"
+        sequence="10"
+        groups="base.group_system"
+    />
+</odoo>

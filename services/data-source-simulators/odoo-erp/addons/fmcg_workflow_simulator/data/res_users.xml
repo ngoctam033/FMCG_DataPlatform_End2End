@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <!-- 1. Quản trị Kho (Inventory Manager) -->
+    <record id="user_inventory_manager_simulator" model="res.users">
+        <field name="name">Inventory Manager Simulator</field>
+        <field name="login">inventory.manager.simulator</field>
+        <field name="active" eval="True"/>
+        <field name="group_ids" eval="[(6, 0, [ref('base.group_user'), ref('stock.group_stock_manager')])]"/>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="company_ids" eval="[(4, ref('base.main_company'))]"/>
+    </record>
+
+    <!-- 2. Nhân viên Kho (Inventory User) -->
+    <record id="user_inventory_user_simulator" model="res.users">
+        <field name="name">Inventory User Simulator</field>
+        <field name="login">inventory.user.simulator</field>
+        <field name="active" eval="True"/>
+        <field name="group_ids" eval="[(6, 0, [ref('base.group_user'), ref('stock.group_stock_user')])]"/>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="company_ids" eval="[(4, ref('base.main_company'))]"/>
+    </record>
+
+    <!-- 3. Quản trị Mua hàng (Purchase Manager) -->
+    <record id="user_purchase_manager_simulator" model="res.users">
+        <field name="name">Purchase Manager Simulator</field>
+        <field name="login">purchase.manager.simulator</field>
+        <field name="active" eval="True"/>
+        <field name="group_ids" eval="[(6, 0, [ref('base.group_user'), ref('purchase.group_purchase_manager')])]"/>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="company_ids" eval="[(4, ref('base.main_company'))]"/>
+    </record>
+
+    <!-- 4. Nhân viên Mua hàng (Purchase User) -->
+    <record id="user_purchase_user_simulator" model="res.users">
+        <field name="name">Purchase User Simulator</field>
+        <field name="login">purchase.user.simulator</field>
+        <field name="active" eval="True"/>
+        <field name="group_ids" eval="[(6, 0, [ref('base.group_user'), ref('purchase.group_purchase_user')])]"/>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="company_ids" eval="[(4, ref('base.main_company'))]"/>
+    </record>
+</odoo>
