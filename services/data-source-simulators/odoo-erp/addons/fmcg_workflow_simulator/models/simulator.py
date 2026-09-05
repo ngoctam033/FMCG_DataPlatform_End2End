@@ -38,7 +38,19 @@ class FmcgSimulatorRun(models.AbstractModel):
         self = self.with_user(user).with_company(user.company_id)
         
         _, category = self._get_replenishment_master_data()
-        orderpoints = self._get_raw_material_orderpoints(category)
+        other_categories = self.env["product.category"].search([
+            ("name", "in", [
+                "Hàng thương mại",
+                "Hàng đông lạnh",
+                "Bao bì đa ngành",
+                "Chăm sóc cá nhân",
+                "Chăm sóc gia đình",
+                "Thực phẩm ăn liền",
+                "Bánh kẹo & Snack",
+                "Gia vị",
+            ]),
+        ])
+        orderpoints = self._get_replenishment_orderpoints(category | other_categories)
         if orderpoints:
             _logger.info("Inventory Manager: Kích hoạt Procurement cho %d rules", len(orderpoints))
             
@@ -57,6 +69,19 @@ class FmcgSimulatorRun(models.AbstractModel):
             _logger.info("--- KẾT QUẢ ACTION_REPLENISH ---")
             if new_pos:
                 _logger.info("- Tạo mới %d Purchase Orders: %s", len(new_pos), new_pos.mapped('name'))
+
+                # Tự động tạo Activity giao việc cho Purchase User
+                purchase_user = self._get_simulator_user("purchase.user.simulator")
+                if purchase_user:
+                    # Sửa lỗi AccessError: Dùng sudo() vì Inventory Manager không có quyền tạo activity trên form Purchase
+                    new_pos.sudo().activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        user_id=purchase_user.id,
+                        summary='Chốt đơn mua hàng (Tự động từ Simulator)',
+                        note='Hệ thống tự động báo thiếu kho và sinh ra yêu cầu mua hàng này.'
+                    )
+                    _logger.info("- Đã giao %d task (Activities) cho %s", len(new_pos), purchase_user.login)
+
             if new_pickings:
                 _logger.info("- Tạo mới %d Stock Pickings: %s", len(new_pickings), new_pickings.mapped('name'))
             
