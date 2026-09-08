@@ -1,6 +1,7 @@
 import logging
 
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 import random
 
@@ -199,5 +200,245 @@ class FmcgSimulatorRun(models.AbstractModel):
                         skip_sanity_check=True,
                         skip_backorder=True,
                     ).button_validate()
+
+        return True
+
+    @api.model
+    def cron_inventory_replenish_new(self):
+        inventory_manager = self.env.ref(
+            "fmcg_workflow_simulator.user_inventory_manager_simulator"
+        )
+
+        runner = self.with_user(inventory_manager)
+
+        # Lấy toàn bộ orderpoint
+        orderpoints = self.with_user(inventory_manager).env["stock.warehouse.orderpoint"].search([], order="id")
+
+        # Từ toàn bộ quy tắc tồn kho, chỉ giữ lại những orderpoint đang thực sự
+        # cần bổ sung hàng.
+        # Với orderpoint không bị tạm hoãn (`snoozed_until = False`) hoặc đã
+        # đến ngày xử lý lại, Inventory Manager mới thực hiện Replenish.
+        due_orderpoints = orderpoints.filtered_domain([
+            ("qty_to_order", ">", 0),
+            "|",
+            ("snoozed_until", "=", False),
+            ("snoozed_until", "<=", fields.Date.today()),
+        ])
+
+        # 1. Tạo/bổ sung nguồn cung.
+        for orderpoint in due_orderpoints:
+            orderpoint_id = orderpoint.id
+            product_name = orderpoint.product_id.display_name
+            required_qty = orderpoint.qty_to_order
+
+            result = orderpoint.action_replenish()
+        return True
+
+    @api.model
+    def cron_purchase_user_process(self):
+        purchase_user = self.env.ref(
+            "fmcg_workflow_simulator.user_purchase_user_simulator"
+        )
+
+        runner = self.with_user(purchase_user).with_company(
+            purchase_user.company_id
+        )
+        draft_rfqs = runner.env["purchase.order"].search([])
+
+        for rfq in draft_rfqs:
+            result = rfq.button_confirm()
+            if isinstance(result, dict):
+                _logger.error(
+                    "RFQ %s requires popup/action handling: %s",
+                    rfq.display_name,
+                    result,
+                )
+                raise UserError(
+                    "RFQ %s requires popup/action handling."
+                    % rfq.display_name
+                )
+
+        return True
+
+    @api.model
+    def cron_purchase_manager_approve(self):
+        purchase_manager = self.env.ref(
+            "fmcg_workflow_simulator.user_purchase_manager_simulator"
+        )
+
+        runner = self.with_user(purchase_manager).with_company(
+            purchase_manager.company_id
+        )
+        purchase_orders = runner.env["purchase.order"].search([
+            ("company_id", "=", purchase_manager.company_id.id),
+            ("state", "=", "to approve"),
+        ], order="id")
+
+        for purchase_order in purchase_orders:
+            manager_action = random.choices(
+                ["approve", "reject", "skip"],
+                weights=[70, 20, 10],
+                k=1,
+            )[0]
+
+            if manager_action == "skip":
+                continue
+
+            if manager_action == "approve":
+                result = purchase_order.button_approve()
+                if purchase_order.state not in ["purchase", "done"]:
+                    _logger.error(
+                        "Purchase order %s was not approved. "
+                        "button_approve result: %s; state: %s",
+                        purchase_order.display_name,
+                        result,
+                        purchase_order.state,
+                    )
+                    raise UserError(
+                        "Purchase order %s was not approved."
+                        % purchase_order.display_name
+                    )
+            else:
+                purchase_order.button_cancel()
+                if purchase_order.state != "cancel":
+                    _logger.error(
+                        "Purchase order %s was not cancelled; state: %s",
+                        purchase_order.display_name,
+                        purchase_order.state,
+                    )
+                    raise UserError(
+                        "Purchase order %s was not cancelled."
+                        % purchase_order.display_name
+                    )
+
+        return True
+
+    @api.model
+    def cron_purchase_cancel_postprocess(self):
+        purchase_manager = self.env.ref(
+            "fmcg_workflow_simulator.user_purchase_manager_simulator"
+        )
+        simulator_users = self.env["res.users"].browse([
+            self.env.ref(
+                "fmcg_workflow_simulator.user_purchase_user_simulator"
+            ).id,
+            purchase_manager.id,
+            self.env.ref(
+                "fmcg_workflow_simulator.user_inventory_user_simulator"
+            ).id,
+        ])
+
+        runner = self.with_user(purchase_manager).with_company(
+            purchase_manager.company_id
+        )
+        cancelled_orders = runner.env["purchase.order"].search([
+            ("company_id", "=", purchase_manager.company_id.id),
+            ("state", "=", "cancel"),
+        ], order="id")
+
+        for purchase_order in cancelled_orders:
+            activities = runner.env["mail.activity"].sudo().search([
+                ("res_model", "=", "purchase.order"),
+                ("res_id", "=", purchase_order.id),
+                ("user_id", "in", simulator_users.ids),
+            ])
+            if not activities:
+                continue
+
+            activities.action_feedback(
+                feedback="Đóng tự động vì đơn mua hàng đã bị hủy."
+            )
+            _logger.info(
+                "Closed %s simulator activities for cancelled purchase "
+                "order %s",
+                len(activities),
+                purchase_order.display_name,
+            )
+
+        return True
+
+    @api.model
+    def cron_inventory_user_receipt(self):
+        inventory_user = self.env.ref(
+            "fmcg_workflow_simulator.user_inventory_user_simulator"
+        )
+
+        runner = self.with_user(inventory_user).with_company(
+            inventory_user.company_id
+        )
+        incoming_pickings = runner.env["stock.picking"].search([
+            ("company_id", "=", inventory_user.company_id.id),
+            ("picking_type_id.code", "=", "incoming"),
+            ("state", "=", "assigned"),
+        ], order="id")
+
+        for picking in incoming_pickings:
+            for move in picking.move_ids:
+                if not move.quantity:
+                    move.quantity = move.product_uom_qty
+
+            result = picking.button_validate()
+            if picking.state != "done":
+                _logger.error(
+                    "Incoming picking %s was not validated. "
+                    "button_validate result: %s; state: %s",
+                    picking.display_name,
+                    result,
+                    picking.state,
+                )
+                raise UserError(
+                    "Incoming picking %s requires additional validation."
+                    % picking.display_name
+                )
+
+            if isinstance(result, dict):
+                _logger.info(
+                    "Incoming picking %s was validated and returned action: %s",
+                    picking.display_name,
+                    result,
+                )
+
+        return True
+
+    @api.model
+    def cron_inventory_user_internal_transfer(self):
+        inventory_user = self.env.ref(
+            "fmcg_workflow_simulator.user_inventory_user_simulator"
+        )
+
+        runner = self.with_user(inventory_user).with_company(
+            inventory_user.company_id
+        )
+        internal_pickings = runner.env["stock.picking"].search([
+            ("company_id", "=", inventory_user.company_id.id),
+            ("picking_type_id.code", "=", "internal"),
+            ("state", "=", "assigned"),
+        ], order="id")
+
+        for picking in internal_pickings:
+            for move in picking.move_ids:
+                if not move.quantity:
+                    move.quantity = move.product_uom_qty
+
+            result = picking.button_validate()
+            if picking.state != "done":
+                _logger.error(
+                    "Internal picking %s was not validated. "
+                    "button_validate result: %s; state: %s",
+                    picking.display_name,
+                    result,
+                    picking.state,
+                )
+                raise UserError(
+                    "Internal picking %s requires additional validation."
+                    % picking.display_name
+                )
+
+            if isinstance(result, dict):
+                _logger.info(
+                    "Internal picking %s was validated and returned action: %s",
+                    picking.display_name,
+                    result,
+                )
 
         return True

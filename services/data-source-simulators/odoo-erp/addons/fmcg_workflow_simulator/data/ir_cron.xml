@@ -1,5 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="0">
+    <record id="ir_cron_fmcg_inventory_replenish_new" model="ir.cron">
+        <field name="name">FMCG: Inventory Manager - Replenish</field>
+        <field name="model_id" ref="model_fmcg_simulator_run"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_inventory_replenish_new()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <!-- Enable after the replenishment method is ready. -->
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_fmcg_purchase_user_process" model="ir.cron">
+        <field name="name">FMCG: Purchase User - Confirm Draft RFQs</field>
+        <field name="model_id" ref="model_fmcg_simulator_run"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_purchase_user_process()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_fmcg_purchase_manager_approve" model="ir.cron">
+        <field name="name">FMCG: Purchase Manager - Approve Purchase Orders</field>
+        <field name="model_id" ref="model_fmcg_simulator_run"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_purchase_manager_approve()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_fmcg_purchase_cancel_postprocess" model="ir.cron">
+        <field name="name">FMCG: Purchase - Post-process Cancelled Orders</field>
+        <field name="model_id" ref="model_fmcg_simulator_run"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_purchase_cancel_postprocess()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_fmcg_inventory_user_receipt" model="ir.cron">
+        <field name="name">FMCG: Inventory User - Validate Receipts</field>
+        <field name="model_id" ref="model_fmcg_simulator_run"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_inventory_user_receipt()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_fmcg_inventory_user_internal_transfer" model="ir.cron">
+        <field name="name">FMCG: Inventory User - Validate Internal Transfers</field>
+        <field name="model_id" ref="model_fmcg_simulator_run"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_inventory_user_internal_transfer()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
     <record id="ir_cron_fmcg_workflow_simulator_master" model="ir.cron">
         <field name="name">FMCG: Master workflow simulator</field>
         <field name="model_id" ref="model_fmcg_simulator_run"/>
@@ -7,6 +68,6 @@
         <field name="code">model.cron_master()</field>
         <field name="interval_number">5</field>
         <field name="interval_type">minutes</field>
-        <field name="active" eval="True"/>
+        <field name="active" eval="False"/>
     </record>
 </odoo>
