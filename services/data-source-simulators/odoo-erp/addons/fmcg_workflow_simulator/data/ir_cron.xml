@@ -89,9 +89,9 @@
             model.cron_inventory_create_receipt_request()
         </field>
         <field name="interval_number">15</field>
-        <field name="interval_type">minutes</field>
+        <field name="interval_type">months</field>
 
         <!-- Chỉ bật sau khi đã kiểm thử trên database thử nghiệm. -->
-         <field name="active" eval="False"/>
+         <field name="active" eval="True"/>
     </record>
 </odoo>
