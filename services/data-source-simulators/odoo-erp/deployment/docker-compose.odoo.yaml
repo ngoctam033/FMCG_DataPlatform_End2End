@@ -52,29 +52,7 @@ services:
     networks:
       - odoo-network
 
-  inventory-simulator:
-    build:
-      context: ./inventory-simulator
-    profiles: [simulator]
-    depends_on:
-      odoo:
-        condition: service_healthy
-    environment:
-      ODOO_BASE_URL: ${ODOO_BASE_URL:-http://odoo:8069}
-      ODOO_DATABASE: ${ODOO_DATABASE:-fmcg_erp}
-      ODOO_API_KEY: ${ODOO_API_KEY:?Set ODOO_API_KEY for the inventory simulator}
-      SIMULATOR_CRON: ${SIMULATOR_CRON:-*/5 * * * *}
-      SIMULATOR_BATCH_SIZE: ${SIMULATOR_BATCH_SIZE:-50}
-      SIMULATOR_RUN_ON_START: ${SIMULATOR_RUN_ON_START:-true}
-      SIMULATOR_TIMEZONE: ${SIMULATOR_TIMEZONE:-Asia/Ho_Chi_Minh}
-      ODOO_REQUEST_TIMEOUT: ${ODOO_REQUEST_TIMEOUT:-120}
-      SIMULATOR_LOOKUP_PAGE_SIZE: ${SIMULATOR_LOOKUP_PAGE_SIZE:-500}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      PYTHONUNBUFFERED: "1"
-    restart: unless-stopped
-    networks:
-      - odoo-network
-
 networks:
   odoo-network:
+    name: ${ODOO_NETWORK_NAME:-fmcg-odoo-network}
     driver: bridge
