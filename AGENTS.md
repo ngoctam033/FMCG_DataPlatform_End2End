@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## Quy tắc trả lời
+
+- Trả lời ngắn gọn, trực tiếp vào câu hỏi chính của người dùng.
+- Không mở rộng sang nội dung liên quan nếu người dùng không yêu cầu.
+- Chỉ cung cấp lượng giải thích, ví dụ và lưu ý cần thiết để làm rõ câu trả lời.
+- Tránh lặp lại thông tin đã nêu trong các câu trả lời trước.
+- Khi câu hỏi có thể trả lời trong vài câu, không dùng cấu trúc dài hoặc liệt kê quá nhiều mục.
+
 ## Human-Controlled Implementation Policy
 
 ### Nguyên tắc mặc định
@@ -140,4 +148,3 @@ Nếu cần nội dung để giải thích mục đích, chỉ sử dụng comme
 ```text
 Placeholder only — production implementation must be added manually.
 ```
-

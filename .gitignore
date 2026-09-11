@@ -54,4 +54,4 @@ artifacts/
 *.parquet
 *.avro
 *.orc
-
+.local/

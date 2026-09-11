@@ -373,9 +373,9 @@ class FmcgSimulatorRun(models.AbstractModel):
         ], order="id")
 
         for picking in incoming_pickings:
-            for move in picking.move_ids:
-                if not move.quantity:
-                    move.quantity = move.product_uom_qty
+            # for move in picking.move_ids:
+            #     if not move.quantity:
+            #         move.quantity = move.product_uom_qty
 
             result = picking.button_validate()
             if picking.state != "done":
