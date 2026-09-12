@@ -114,4 +114,14 @@
         <field name="interval_type">minutes</field>
         <field name="active" eval="True"/>
     </record>
+
+    <record id="ir_cron_fmcg_inventory_prepare_multi_lot_receipts" model="ir.cron">
+        <field name="name">FMCG: Inventory - Prepare Multi-Lot Receipts</field>
+        <field name="model_id" ref="model_fmcg_simulator_run"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_inventory_prepare_multi_lot_receipts()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
 </odoo>

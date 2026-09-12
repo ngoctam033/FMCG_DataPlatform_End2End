@@ -184,3 +184,95 @@ class FmcgInventorySimulator(models.AbstractModel):
                 )
 
         return True
+
+    @api.model
+    def cron_inventory_prepare_multi_lot_receipts(self, limit=30):
+        inventory_user = self.env.ref(
+            "fmcg_workflow_simulator.user_inventory_user_simulator"
+        )
+
+        pickings = self.env["stock.picking"].search([
+            ("picking_type_id.code", "=", "incoming"),
+            ("state", "=", "assigned"),
+            ("move_ids.picked", "=", False),
+        ], limit=limit)
+
+        for picking in pickings:
+            try:
+                moves = picking.move_ids.filtered(
+                    lambda move: (
+                        move.state not in ("done", "cancel")
+                        and not move.picked
+                        and move.product_id.tracking == "lot"
+                        and not move.move_line_ids
+                    )
+                )
+
+                for move in moves:
+                    received_qty = move.product_uom_qty
+                    rounding = move.product_uom.rounding
+
+                    # Không đủ lượng để chia tối thiểu hai lô.
+                    if received_qty < rounding * 2:
+                        continue
+
+                    lot_count = random.randint(2, min(4, int(
+                        received_qty / rounding
+                    )))
+
+                    remaining_qty = received_qty
+
+                    for index in range(1, lot_count + 1):
+                        if index == lot_count:
+                            lot_qty = remaining_qty
+                        else:
+                            max_qty = (
+                                remaining_qty
+                                - rounding * (lot_count - index)
+                            )
+                            lot_qty = float_round(
+                                random.uniform(rounding, max_qty),
+                                precision_rounding=rounding,
+                            )
+
+                        lot = self.env["stock.lot"].with_user(
+                            inventory_user
+                        ).create({
+                            "name": (
+                                f"FMCG-{picking.name.replace('/', '-')}"
+                                f"-{move.id}-{index}"
+                            ),
+                            "product_id": move.product_id.id,
+                            "company_id": picking.company_id.id,
+                        })
+
+                        self.env["stock.move.line"].with_user(
+                            inventory_user
+                        ).create({
+                            "move_id": move.id,
+                            "picking_id": picking.id,
+                            "product_id": move.product_id.id,
+                            "product_uom_id": move.product_uom.id,
+                            "lot_id": lot.id,
+                            "quantity": lot_qty,
+                            "location_id": move.location_id.id,
+                            "location_dest_id": move.location_dest_id.id,
+                            "picked": True,
+                        })
+
+                        remaining_qty -= lot_qty
+
+                    _logger.info(
+                        "Receipt %s, product %s split into %s lots",
+                        picking.name,
+                        move.product_id.display_name,
+                        lot_count,
+                    )
+
+            except Exception:
+                _logger.exception(
+                    "Cannot prepare multi-lot receipt %s",
+                    picking.name,
+                )
+
+        return True
