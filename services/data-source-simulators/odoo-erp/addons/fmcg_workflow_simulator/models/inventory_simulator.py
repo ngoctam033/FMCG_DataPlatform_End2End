@@ -75,3 +75,25 @@ class FmcgInventorySimulator(models.AbstractModel):
             })
             self.env.cr.commit()
         return True
+
+    @api.model
+    def cron_inventory_confirm_receipts(self, limit=100):
+        inventory_user = self.env.ref(
+            "fmcg_workflow_simulator.user_inventory_user_simulator"
+        )
+
+        # Chi lấy những Stock.picking có state là draft và code = incoming
+        pickings = self.env["stock.picking"].search([
+            ("picking_type_id.code", "=", "incoming"),
+            ("state", "=", "draft"),
+            ("move_ids", "!=", False),
+        ], limit=limit)
+
+        for picking in pickings:
+            try:
+                with self.env.cr.savepoint():
+                    picking.with_user(inventory_user).action_confirm()
+            except Exception:
+                _logger.exception("Cannot confirm picking %s", picking.name)
+
+        return True
