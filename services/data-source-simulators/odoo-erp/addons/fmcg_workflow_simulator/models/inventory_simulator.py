@@ -3,6 +3,7 @@ import random
 from itertools import product
 from odoo import Command, api, models
 from odoo.exceptions import UserError
+from odoo.tools.float_utils import float_round
 
 _logger = logging.getLogger(__name__)
 
@@ -95,5 +96,68 @@ class FmcgInventorySimulator(models.AbstractModel):
                     picking.with_user(inventory_user).action_confirm()
             except Exception:
                 _logger.exception("Cannot confirm picking %s", picking.name)
+
+        return True
+
+    @api.model
+    def cron_inventory_prepare_receipts(self, limit=50):
+        inventory_user = self.env.ref(
+            "fmcg_workflow_simulator.user_inventory_user_simulator"
+        )
+
+        pickings = self.env["stock.picking"].search([
+            ("picking_type_id.code", "=", "incoming"),
+            ("state", "=", "assigned"),
+            ("move_ids.picked", "=", False),
+        ], limit=limit)
+
+        # Chọn ngẫu nhiên một kịch bản nhận hàng cho mỗi picking:
+        # - 70% nhận đủ
+        # - 20% nhận thiếu
+        # - 5% không nhận được hàng
+        # - 5% nhận dư
+        scenarios = random.choices(
+            ["full", "partial", "none", "excess"],
+            weights=[70, 20, 5, 5],
+            k=len(pickings),
+        )
+
+        for picking, scenario in zip(pickings, scenarios):
+            try:
+                moves = picking.move_ids.filtered(
+                    lambda move: (
+                        move.state not in ("done", "cancel")
+                        and not move.picked
+                    )
+                )
+
+                for move in moves:
+                    demand = move.product_uom_qty
+
+                    if scenario == "full":
+                        received_qty = demand
+                    elif scenario == "partial":
+                        received_qty = demand * random.uniform(0.01, 0.99)
+                    elif scenario == "none":
+                        received_qty = 0
+                    else:
+                        received_qty = demand * random.uniform(1.01, 1.20)
+
+                    received_qty = float_round(
+                        received_qty,
+                        precision_rounding=move.product_uom.rounding,
+                    )
+
+                    move.with_user(inventory_user).write({
+                        "quantity": received_qty,
+                        "picked": True,
+                    })
+
+            except Exception:
+                _logger.exception(
+                    "Cannot prepare receipt %s with scenario %s",
+                    picking.name,
+                    scenario,
+                )
 
         return True
