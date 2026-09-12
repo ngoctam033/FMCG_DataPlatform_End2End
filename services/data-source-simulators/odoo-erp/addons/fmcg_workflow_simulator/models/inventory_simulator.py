@@ -1,9 +1,10 @@
 import logging
 import random
 from itertools import product
-from odoo import Command, api, models
+from odoo import Command, api, models, fields
 from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_round
+from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
 
@@ -272,6 +273,103 @@ class FmcgInventorySimulator(models.AbstractModel):
             except Exception:
                 _logger.exception(
                     "Cannot prepare multi-lot receipt %s",
+                    picking.name,
+                )
+
+        return True
+
+    @api.model
+    def cron_inventory_input_invalid_lots(self, limit=20):
+        inventory_user = self.env.ref(
+            "fmcg_workflow_simulator.user_inventory_user_simulator"
+        )
+
+        pickings = self.env["stock.picking"].search([
+            ("picking_type_id.code", "=", "incoming"),
+            ("state", "=", "assigned"),
+        ], limit=limit)
+
+        scenarios = ["missing_lot", "duplicate_serial", "expired_lot"]
+
+        for picking in pickings:
+            try:
+                scenario = random.choice(scenarios)
+
+                for move in picking.move_ids.filtered(
+                    lambda m: m.product_id.tracking in ("lot", "serial")
+                ):
+                    quantity = (
+                        1
+                        if move.product_id.tracking == "serial"
+                        else move.product_uom_qty
+                    )
+
+                    values = {
+                        "move_id": move.id,
+                        "picking_id": picking.id,
+                        "product_id": move.product_id.id,
+                        "product_uom_id": move.product_uom.id,
+                        "location_id": move.location_id.id,
+                        "location_dest_id": move.location_dest_id.id,
+                        "quantity": quantity,
+                        "picked": True,
+                    }
+
+                    if scenario == "missing_lot":
+                        # Cố ý không truyền lot_id/lot_name.
+                        pass
+
+                    elif scenario == "duplicate_serial":
+                        existing_lot = self.env["stock.lot"].search([
+                            ("product_id", "=", move.product_id.id),
+                            ("quant_ids.quantity", ">", 0),
+                            ("quant_ids.location_id.usage", "=", "internal"),
+                        ], limit=1)
+
+                        if not existing_lot:
+                            continue
+
+                        values["lot_id"] = existing_lot.id
+
+                    elif scenario == "expired_lot":
+                        lot_sequence = move.product_id.lot_sequence_id
+
+                        if not lot_sequence:
+                            raise UserError(
+                                "Product %s does not have a Lot/Serial sequence configured."
+                                % move.product_id.display_name
+                            )
+
+                        # Tái hiện nút Generate Serials/Lots → New trên giao diện.
+                        next_lot_name = lot_sequence.next_by_id()
+
+                        lot_values = {
+                            "name": next_lot_name,
+                            "product_id": move.product_id.id,
+                            "company_id": picking.company_id.id,
+                        }
+
+                        if "expiration_date" in self.env["stock.lot"]._fields:
+                            lot_values["expiration_date"] = (
+                                fields.Datetime.now() - timedelta(days=30)
+                            )
+
+                        expired_lot = self.env["stock.lot"].create(lot_values)
+                        values["lot_id"] = expired_lot.id
+
+                    self.env["stock.move.line"].with_user(
+                        inventory_user
+                    ).create(values)
+
+                _logger.info(
+                    "Picking %ss prepared with scenario %s",
+                    picking.name,
+                    scenario,
+                )
+
+            except Exception:
+                _logger.exception(
+                    "Cannot prepare invalid lot scenario for picking %s",
                     picking.name,
                 )
 
