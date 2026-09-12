@@ -88,8 +88,8 @@
         <field name="code">
             model.cron_inventory_create_receipt_request()
         </field>
-        <field name="interval_number">15</field>
-        <field name="interval_type">months</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
 
         <!-- Chỉ bật sau khi đã kiểm thử trên database thử nghiệm. -->
          <field name="active" eval="True"/>
@@ -100,8 +100,8 @@
         <field name="model_id" ref="model_fmcg_simulator_run"/>
         <field name="state">code</field>
         <field name="code">model.cron_inventory_confirm_receipts()</field>
-        <field name="interval_number">15</field>
-        <field name="interval_type">months</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">hours</field>
         <field name="active" eval="True"/>
     </record>
     
@@ -110,7 +110,7 @@
         <field name="model_id" ref="model_fmcg_simulator_run"/>
         <field name="state">code</field>
         <field name="code">model.cron_inventory_prepare_receipts()</field>
-        <field name="interval_number">15</field>
+        <field name="interval_number">30</field>
         <field name="interval_type">minutes</field>
         <field name="active" eval="True"/>
     </record>
