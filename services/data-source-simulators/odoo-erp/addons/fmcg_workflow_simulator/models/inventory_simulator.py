@@ -111,18 +111,20 @@ class FmcgInventorySimulator(models.AbstractModel):
             ("move_ids.picked", "=", False),
         ], limit=limit)
 
+        for picking in pickings:
         # Chọn ngẫu nhiên một kịch bản nhận hàng cho mỗi picking:
-        # - 70% nhận đủ
-        # - 20% nhận thiếu
+        # - 50% nhận đủ
+        # - 15% nhận thiếu
         # - 5% không nhận được hàng
         # - 5% nhận dư
-        scenarios = random.choices(
-            ["full", "partial", "none", "excess"],
-            weights=[70, 20, 5, 5],
-            k=len(pickings),
-        )
+        # - 25% nhận hỗn hợp
 
-        for picking, scenario in zip(pickings, scenarios):
+            picking_scenario = random.choices(
+                ["full", "partial", "none", "excess", "mixed"],
+                weights=[50, 15, 5, 5, 25],
+                k=1,
+            )[0]
+
             try:
                 moves = picking.move_ids.filtered(
                     lambda move: (
@@ -132,12 +134,22 @@ class FmcgInventorySimulator(models.AbstractModel):
                 )
 
                 for move in moves:
+                    scenario = picking_scenario
+
+                    # Mỗi sản phẩm có tình trạng nhận hàng riêng.
+                    if picking_scenario == "mixed":
+                        scenario = random.choices(
+                            ["full", "partial", "none"],
+                            weights=[60, 30, 10],
+                            k=1,
+                        )[0]
+
                     demand = move.product_uom_qty
 
                     if scenario == "full":
                         received_qty = demand
                     elif scenario == "partial":
-                        received_qty = demand * random.uniform(0.01, 0.99)
+                        received_qty = demand * random.uniform(0.50, 0.99)
                     elif scenario == "none":
                         received_qty = 0
                     else:
@@ -150,8 +162,19 @@ class FmcgInventorySimulator(models.AbstractModel):
 
                     move.with_user(inventory_user).write({
                         "quantity": received_qty,
+                        # True nghĩa là dòng đã được kiểm nhận,
+                        # kể cả kết quả nhận thực tế bằng 0.
                         "picked": True,
                     })
+
+                    _logger.info(
+                        "Receipt %s, product %s: %s, demand=%s, received=%s",
+                        picking.name,
+                        move.product_id.display_name,
+                        scenario,
+                        demand,
+                        received_qty,
+                    )
 
             except Exception:
                 _logger.exception(
